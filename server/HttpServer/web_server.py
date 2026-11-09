@@ -1,9 +1,89 @@
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
-from pathlib import Path
+import asyncio
 import json
+import os
 
-# Create the FastAPI application
-app = FastAPI()
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
+
+from server.HttpServer.udp_receiver import start_udp_receiver
+
+
+# ==========================================
+# WEBSOCKET CONNECTION MANAGER
+# ==========================================
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections.copy():
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
+
+
+manager = ConnectionManager()
+
+
+# ==========================================
+# UDP RECEIVER LIFECYCLE
+# ==========================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # Track pending broadcast tasks
+    pending_tasks = set()
+
+    def on_sensor_reading(reading: dict):
+        # Schedule a WebSocket broadcast when UDP data arrives
+        task = asyncio.create_task(
+            manager.broadcast({
+                "type": "reading",
+                **reading
+            })
+        )
+
+        pending_tasks.add(task)
+        task.add_done_callback(pending_tasks.discard)
+
+    # Port 5005 matches the group's simulator.
+    # Port 0 allows tests to request a temporary available port.
+    udp_port = int(os.getenv("UDP_PORT", "5005"))
+
+    transport, protocol = await start_udp_receiver(
+        on_sensor_reading,
+        host="0.0.0.0",
+        port=udp_port
+    )
+
+    app.state.udp_transport = transport
+
+    try:
+        yield
+    finally:
+        transport.close()
+
+        if pending_tasks:
+            await asyncio.gather(
+                *pending_tasks,
+                return_exceptions=True
+            )
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # ==========================================
@@ -36,7 +116,6 @@ def get_history(
     from_time: float | None = Query(default=None, alias="from"),
     to_time: float | None = Query(default=None, alias="to")
 ):
-    # Temporary simulated sensor readings
     history = [
         {"room": "A", "ts": 1000, "temperature": 21.5, "humidity": 40.0},
         {"room": "A", "ts": 2000, "temperature": 22.0, "humidity": 42.0},
@@ -52,47 +131,16 @@ def get_history(
 
 
 # ==========================================
-# WEBSOCKET CONNECTION MANAGER
-# ==========================================
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        # Send the same message to every connected dashboard
-        for connection in self.active_connections.copy():
-            try:
-                await connection.send_json(message)
-            except Exception:
-                # Remove connections that can no longer receive updates
-                self.disconnect(connection)
-
-
-# Create the connection manager
-manager = ConnectionManager()
-
-
-# ==========================================
 # WEBSOCKET ENDPOINT
 # ==========================================
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
 
-    # Register the connected dashboard
     await manager.connect(websocket)
 
     try:
-        # Send initial building and sensor information
+        # Send the initial snapshot
         await websocket.send_json({
             "type": "snapshot",
             "blueprint": get_blueprint(),
@@ -100,17 +148,15 @@ async def websocket_endpoint(websocket: WebSocket):
             "levels": {"A": "SAFE"}
         })
 
-        # Keep listening while the dashboard is connected
         while True:
             message = await websocket.receive_text()
 
-            # Check that two-way communication works
             if message == "ping":
                 await websocket.send_json({
                     "type": "pong"
                 })
 
-            # Temporary simulation for testing broadcasting
+            # Temporary demonstration command
             elif message == "demo_reading":
                 await manager.broadcast({
                     "type": "reading",
@@ -124,5 +170,4 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
 
     finally:
-        # Remove the dashboard when its connection ends
         manager.disconnect(websocket)
