@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, WebSocket
 import json
 from pathlib import Path
 
@@ -46,3 +46,15 @@ def get_history(
     and (from_time is None or reading["ts"] >= from_time)
     and (to_time is None or reading["ts"] <= to_time)
 ]
+
+# WebSocket endpoint for real-time sensor updates
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+
+    await websocket.send_json({
+        "type": "snapshot",
+        "blueprint": get_blueprint(),
+        "nodes": [get_nodes()],
+        "levels": {"A": "SAFE"}
+    })

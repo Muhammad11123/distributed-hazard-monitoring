@@ -65,3 +65,13 @@ def test_get_history_time_range():
     assert len(data) == 1
     assert data[0]["room"] == "A"
     assert data[0]["ts"] == 2000
+
+     # Test WebSocket initial snapshot
+def test_websocket_connection():
+    with client.websocket_connect("/ws") as websocket:
+        data = websocket.receive_json()
+
+        assert data["type"] == "snapshot"
+        assert "blueprint" in data
+        assert "nodes" in data
+        assert "levels" in data
