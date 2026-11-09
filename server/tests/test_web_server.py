@@ -37,3 +37,17 @@ def test_get_blueprint():
     assert "B" in data["rooms"]
     assert "EXIT1" in data["rooms"]
     assert data["rooms"]["EXIT1"]["exit"] is True
+
+    # Test historical readings for Room A
+def test_get_history():
+    response = client.get("/api/history?room=A")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    # Check that two readings are returned
+    assert len(data) == 2
+
+    # Check that both readings belong to Room A
+    assert all(reading["room"] == "A" for reading in data)
