@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 import json
 from pathlib import Path
 
@@ -27,13 +27,22 @@ def get_blueprint():
 
 # API endpoint for historical sensor readings
 @app.get("/api/history")
-def get_history(room: str):
+def get_history(
+    room: str,
+    from_time: float | None = Query(default=None, alias="from"),
+    to_time: float | None = Query(default=None, alias="to")
+):
     # Temporary simulated readings
     history = [
-        {"room": "A", "temperature": 21.5, "humidity": 40.0},
-        {"room": "A", "temperature": 22.0, "humidity": 42.0},
-        {"room": "B", "temperature": 23.0, "humidity": 45.0}
-    ]
+    {"room": "A", "ts": 1000, "temperature": 21.5, "humidity": 40.0},
+    {"room": "A", "ts": 2000, "temperature": 22.0, "humidity": 42.0},
+    {"room": "B", "ts": 1500, "temperature": 23.0, "humidity": 45.0}
+]
 
     # Return readings for the requested room
-    return [reading for reading in history if reading["room"] == room]
+    return [
+    reading for reading in history
+    if reading["room"] == room
+    and (from_time is None or reading["ts"] >= from_time)
+    and (to_time is None or reading["ts"] <= to_time)
+]

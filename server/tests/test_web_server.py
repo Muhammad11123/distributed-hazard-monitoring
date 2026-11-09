@@ -51,3 +51,17 @@ def test_get_history():
 
     # Check that both readings belong to Room A
     assert all(reading["room"] == "A" for reading in data)
+
+    # Test history filtering by room and time range
+def test_get_history_time_range():
+    response = client.get(
+        "/api/history?room=A&from=1500&to=2500"
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data) == 1
+    assert data[0]["room"] == "A"
+    assert data[0]["ts"] == 2000
