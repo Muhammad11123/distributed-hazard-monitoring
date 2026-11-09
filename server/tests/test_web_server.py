@@ -83,3 +83,37 @@ def test_websocket_connection():
         # Check that the server responds
         response = websocket.receive_json()
         assert response["type"] == "pong"
+
+        # Test broadcasting to multiple connected dashboards
+def test_websocket_broadcast():
+
+    with TestClient(app) as test_client:
+
+        # Connect the first dashboard
+        with test_client.websocket_connect("/ws") as ws1:
+
+            # Connect the second dashboard
+            with test_client.websocket_connect("/ws") as ws2:
+
+                # Both dashboards receive their initial snapshots
+                snapshot1 = ws1.receive_json()
+                snapshot2 = ws2.receive_json()
+
+                assert snapshot1["type"] == "snapshot"
+                assert snapshot2["type"] == "snapshot"
+
+                # First dashboard triggers a simulated reading
+                ws1.send_text("demo_reading")
+
+                # Both dashboards should receive the update
+                update1 = ws1.receive_json()
+                update2 = ws2.receive_json()
+
+                assert update1["type"] == "reading"
+                assert update2["type"] == "reading"
+
+                assert update1["room"] == "A"
+                assert update2["room"] == "A"
+
+                assert update1["temperature"] == 30
+                assert update2["temperature"] == 30
