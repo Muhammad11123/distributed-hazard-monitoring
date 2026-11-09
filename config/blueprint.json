@@ -1,0 +1,27 @@
+{
+  "rooms": {
+    "A": {
+      "name": "Lab 1",
+      "x": 100,
+      "y": 80
+    },
+    "B": {
+      "name": "Corridor",
+      "x": 250,
+      "y": 80
+    },
+    "EXIT1": {
+      "name": "Main exit",
+      "x": 400,
+      "y": 80,
+      "exit": true
+    }
+  },
+  "connections": [
+    ["A", "B", 5],
+    ["B", "EXIT1", 8]
+  ],
+  "devices": {
+    "AA:BB:CC:DD:EE:01": "A"
+  }
+}
