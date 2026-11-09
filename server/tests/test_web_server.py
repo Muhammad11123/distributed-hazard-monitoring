@@ -66,12 +66,20 @@ def test_get_history_time_range():
     assert data[0]["room"] == "A"
     assert data[0]["ts"] == 2000
 
-     # Test WebSocket initial snapshot
+     # Test WebSocket snapshot and persistent connection
 def test_websocket_connection():
     with client.websocket_connect("/ws") as websocket:
         data = websocket.receive_json()
 
+        # Check the initial snapshot
         assert data["type"] == "snapshot"
         assert "blueprint" in data
         assert "nodes" in data
         assert "levels" in data
+
+        # Send a ping message
+        websocket.send_text("ping")
+
+        # Check that the server responds
+        response = websocket.receive_json()
+        assert response["type"] == "pong"
