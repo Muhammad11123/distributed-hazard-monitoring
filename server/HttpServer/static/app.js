@@ -3,6 +3,7 @@ const sensors = new Map();
 
 const sensorList = document.getElementById("sensor-list");
 const roomList = document.getElementById("room-list");
+const floorPlan = document.getElementById("floor-plan");
 
 const sensorCount = document.getElementById("sensor-count");
 const roomCount = document.getElementById("room-count");
@@ -10,6 +11,8 @@ const lastUpdate = document.getElementById("last-update");
 
 const connectionStatus = document.getElementById("connection-status");
 const connectionDot = document.getElementById("connection-dot");
+
+const svgNamespace = "http://www.w3.org/2000/svg";
 
 function setConnectionStatus(status) {
     connectionStatus.textContent = status;
@@ -46,6 +49,20 @@ function createElement(tag, className, text) {
 
     if (text !== undefined) {
         element.textContent = text;
+    }
+
+    return element;
+}
+
+function svgElement(tag, attributes = {}, text = null) {
+    const element = document.createElementNS(svgNamespace, tag);
+
+    for (const [name, value] of Object.entries(attributes)) {
+        element.setAttribute(name, String(value));
+    }
+
+    if (text !== null) {
+        element.textContent = String(text);
     }
 
     return element;
@@ -266,6 +283,204 @@ function renderRooms(blueprint) {
     }
 }
 
+function renderFloorPlan(blueprint) {
+    if (!floorPlan) {
+        return;
+    }
+
+    floorPlan.replaceChildren();
+
+    const rooms = blueprint?.rooms || {};
+    const connections = blueprint?.connections || [];
+
+    const validRooms = Object.entries(rooms).filter(
+        ([, room]) =>
+            room &&
+            room.x !== null &&
+            room.x !== undefined &&
+            room.y !== null &&
+            room.y !== undefined &&
+            room.x !== "" &&
+            room.y !== "" &&
+            Number.isFinite(Number(room.x)) &&
+            Number.isFinite(Number(room.y))
+    );
+
+    if (validRooms.length === 0) {
+        floorPlan.appendChild(
+            createElement(
+                "div",
+                "empty-state",
+                "No building layout available."
+            )
+        );
+        return;
+    }
+
+    const roomPositions = new Map(
+        validRooms.map(([id, room]) => [
+            id,
+            {
+                x: Number(room.x),
+                y: Number(room.y),
+                name: room.name || id,
+                exit: room.exit === true
+            }
+        ])
+    );
+
+    const xs = [...roomPositions.values()].map(room => room.x);
+    const ys = [...roomPositions.values()].map(room => room.y);
+
+    const paddingX = 100;
+    const paddingY = 95;
+
+    const minX = Math.min(...xs) - paddingX;
+    const minY = Math.min(...ys) - paddingY;
+
+    const width = Math.max(
+        300,
+        Math.max(...xs) - Math.min(...xs) + paddingX * 2
+    );
+
+    const height = Math.max(
+        200,
+        Math.max(...ys) - Math.min(...ys) + paddingY * 2
+    );
+
+    const svg = svgElement("svg", {
+        viewBox: `${minX} ${minY} ${width} ${height}`,
+        role: "img",
+        "aria-label": "Building connectivity diagram showing rooms and exits",
+        preserveAspectRatio: "xMidYMid meet"
+    });
+
+    svg.classList.add("building-svg");
+
+    for (const connection of connections) {
+        if (!Array.isArray(connection) || connection.length < 2) {
+            continue;
+        }
+
+        const [startId, endId, weight] = connection;
+
+        const start = roomPositions.get(startId);
+        const end = roomPositions.get(endId);
+
+        if (!start || !end) {
+            continue;
+        }
+
+        const line = svgElement("line", {
+            x1: start.x,
+            y1: start.y,
+            x2: end.x,
+            y2: end.y,
+            class: "floor-connection"
+        });
+
+        svg.appendChild(line);
+
+        if (
+            weight !== undefined &&
+            weight !== null &&
+            weight !== ""
+        ) {
+            const middleX = (start.x + end.x) / 2;
+            const middleY = (start.y + end.y) / 2 - 16;
+
+            const weightGroup = svgElement("g");
+
+            weightGroup.appendChild(
+                svgElement("rect", {
+                    x: middleX - 16,
+                    y: middleY - 14,
+                    width: 32,
+                    height: 25,
+                    rx: 5,
+                    class: "floor-weight-background"
+                })
+            );
+
+            weightGroup.appendChild(
+                svgElement(
+                    "text",
+                    {
+                        x: middleX,
+                        y: middleY + 3,
+                        class: "floor-weight-text",
+                        "text-anchor": "middle"
+                    },
+                    weight
+                )
+            );
+
+            svg.appendChild(weightGroup);
+        }
+    }
+
+    for (const [id, room] of roomPositions) {
+        const group = svgElement("g", {
+            class: room.exit ? "floor-exit" : "floor-room"
+        });
+
+        group.appendChild(
+            svgElement("circle", {
+                cx: room.x,
+                cy: room.y,
+                r: 30,
+                class: "floor-node"
+            })
+        );
+
+        group.appendChild(
+            svgElement(
+                "text",
+                {
+                    x: room.x,
+                    y: room.y + 5,
+                    "text-anchor": "middle",
+                    class: "floor-node-id"
+                },
+                room.exit ? "EXIT" : id
+            )
+        );
+
+        group.appendChild(
+            svgElement(
+                "text",
+                {
+                    x: room.x,
+                    y: room.y + 52,
+                    "text-anchor": "middle",
+                    class: "floor-node-label"
+                },
+                room.name
+            )
+        );
+
+        group.appendChild(
+            svgElement(
+                "title",
+                {},
+                `${room.name} (${id})${room.exit ? " — Exit" : ""}`
+            )
+        );
+
+        svg.appendChild(group);
+    }
+
+    floorPlan.appendChild(svg);
+
+    floorPlan.appendChild(
+        createElement(
+            "p",
+            "floor-plan-note",
+            "Connectivity diagram only. Connection weights are not verified distances. Not to scale."
+        )
+    );
+}
+
 function updateSensor(reading) {
     const id = reading.mac_address || reading.device;
 
@@ -313,6 +528,7 @@ function connectWebSocket() {
 
             renderSensors();
             renderRooms(data.blueprint);
+            renderFloorPlan(data.blueprint);
 
             if (sensors.size > 0) {
                 lastUpdate.textContent =
@@ -327,7 +543,6 @@ function connectWebSocket() {
 
     websocket.onclose = () => {
         setConnectionStatus("Disconnected");
-
         setTimeout(connectWebSocket, 3000);
     };
 
