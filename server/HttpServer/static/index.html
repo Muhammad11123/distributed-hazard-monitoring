@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Hazard Monitoring</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/app.js" defer></script>
+</head>
+<body>
+    <header class="header">
+        <div>
+            <p class="eyebrow">Distributed Hazard Monitoring</p>
+            <h1>Monitoring Dashboard</h1>
+            <p class="subtitle">Live environmental sensor information</p>
+        </div>
+
+        <div class="connection">
+            <span id="connection-dot" class="dot"></span>
+            <span id="connection-status">Connecting...</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="notice">
+            Prototype monitoring system. Do not rely on this
+            dashboard for emergency evacuation decisions.
+        </div>
+
+        <section class="overview">
+            <div class="stat">
+                <span class="stat-label">Sensors reporting</span>
+                <strong id="sensor-count">0</strong>
+            </div>
+
+            <div class="stat">
+                <span class="stat-label">Rooms configured</span>
+                <strong id="room-count">0</strong>
+            </div>
+
+            <div class="stat">
+                <span class="stat-label">Last update</span>
+                <strong id="last-update">No data</strong>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div>
+                    <h2>Sensor Readings</h2>
+                    <p>Latest readings received from the sensor nodes</p>
+                </div>
+            </div>
+
+            <div id="sensor-list" class="sensor-grid">
+                <div class="empty-state">
+                    Waiting for sensor readings...
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div>
+                    <h2>Building Rooms</h2>
+                    <p>Rooms loaded from the building configuration</p>
+                </div>
+            </div>
+
+            <div id="room-list" class="room-grid">
+                <div class="empty-state">
+                    Waiting for building information...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        Distributed Hazard Monitoring · University Project Prototype
+    </footer>
+</body>
+</html>

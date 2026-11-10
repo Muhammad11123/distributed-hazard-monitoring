@@ -17,6 +17,8 @@ from pydantic import BaseModel
 
 from server.HttpServer.udp_receiver import start_udp_receiver
 
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 class ConnectionManager:
     def __init__(self):
@@ -85,6 +87,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+static_dir = Path(__file__).resolve().parent / "static"
+
+app.mount(
+    "/static",
+    StaticFiles(directory=static_dir),
+    name="static"
+)
+
+@app.get("/")
+def dashboard():
+    return FileResponse(static_dir / "index.html")
 
 @app.get("/api/nodes")
 def get_nodes():
