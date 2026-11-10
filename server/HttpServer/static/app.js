@@ -25,8 +25,12 @@ function setConnectionStatus(status) {
 function formatValue(value, unit = "") {
     const number = Number(value);
 
-    if (value === null || value === undefined ||
-        !Number.isFinite(number)) {
+    if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        !Number.isFinite(number)
+    ) {
         return "N/A";
     }
 
@@ -49,9 +53,68 @@ function createElement(tag, className, text) {
 
 function addReading(container, label, value) {
     const item = createElement("div", "reading");
+
     item.appendChild(createElement("span", "", label));
     item.appendChild(createElement("strong", "", value));
+
     container.appendChild(item);
+}
+
+function getSensorStatus(sensor) {
+    const rawStatus = sensor.status;
+
+    if (
+        rawStatus === null ||
+        rawStatus === undefined ||
+        rawStatus === ""
+    ) {
+        return {
+            label: "UNKNOWN",
+            className: "status-unknown"
+        };
+    }
+
+    const status = Number(rawStatus);
+
+    if (!Number.isInteger(status)) {
+        return {
+            label: "UNKNOWN",
+            className: "status-unknown"
+        };
+    }
+
+    if (status === 2) {
+        return {
+            label: "NORMAL",
+            className: "status-safe"
+        };
+    }
+
+    if ([11, 14, 16].includes(status)) {
+        return {
+            label: "WARNING",
+            className: "status-warning"
+        };
+    }
+
+    if ([12, 15, 17].includes(status)) {
+        return {
+            label: "DANGER",
+            className: "status-danger"
+        };
+    }
+
+    if ([0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 13].includes(status)) {
+        return {
+            label: "FAULT / NOT READY",
+            className: "status-unknown"
+        };
+    }
+
+    return {
+        label: "UNKNOWN",
+        className: "status-unknown"
+    };
 }
 
 function renderSensors() {
@@ -70,33 +133,84 @@ function renderSensors() {
     }
 
     for (const sensor of sensors.values()) {
-        const card = createElement("article", "sensor-card");
+        const status = getSensorStatus(sensor);
+
+        const card = createElement(
+            "article",
+            `sensor-card ${status.className}`
+        );
+
         const heading = createElement("div", "card-heading");
         const titleGroup = createElement("div");
 
         titleGroup.appendChild(
-            createElement("h3", "", sensor.device || "Unknown sensor")
+            createElement(
+                "h3",
+                "",
+                sensor.device || "Unknown sensor"
+            )
         );
 
         titleGroup.appendChild(
-            createElement("p", "card-subtitle", sensor.mac_address || "")
+            createElement(
+                "p",
+                "card-subtitle",
+                sensor.mac_address || ""
+            )
         );
 
         heading.appendChild(titleGroup);
-        heading.appendChild(
-            createElement("span", "tag", "Status: " + (sensor.status ?? "Unknown"))
+
+        const statusTag = createElement(
+            "span",
+            `tag status-tag ${status.className}`,
+            status.label
         );
 
+        statusTag.title = `Reported sensor status: ${String(
+            sensor.status ?? "not provided"
+        )}`;
+
+        heading.appendChild(statusTag);
         card.appendChild(heading);
 
         const readings = createElement("div", "readings");
 
-        addReading(readings, "Temperature", formatValue(sensor.temperature, "°C"));
-        addReading(readings, "Humidity", formatValue(sensor.humidity, "%"));
-        addReading(readings, "CO₂", formatValue(sensor.carbon_dioxide));
-        addReading(readings, "Natural gas", formatValue(sensor.natural_gas));
-        addReading(readings, "Carbon monoxide", formatValue(sensor.carbon_monoxide));
-        addReading(readings, "Smoke", formatValue(sensor.smoke));
+        addReading(
+            readings,
+            "Temperature",
+            formatValue(sensor.temperature, "°C")
+        );
+
+        addReading(
+            readings,
+            "Humidity",
+            formatValue(sensor.humidity, "%")
+        );
+
+        addReading(
+            readings,
+            "CO₂",
+            formatValue(sensor.carbon_dioxide)
+        );
+
+        addReading(
+            readings,
+            "Natural gas",
+            formatValue(sensor.natural_gas)
+        );
+
+        addReading(
+            readings,
+            "Carbon monoxide",
+            formatValue(sensor.carbon_monoxide)
+        );
+
+        addReading(
+            readings,
+            "Smoke",
+            formatValue(sensor.smoke)
+        );
 
         card.appendChild(readings);
         sensorList.appendChild(card);
@@ -113,7 +227,11 @@ function renderRooms(blueprint) {
 
     if (entries.length === 0) {
         roomList.appendChild(
-            createElement("div", "empty-state", "No rooms configured.")
+            createElement(
+                "div",
+                "empty-state",
+                "No rooms configured."
+            )
         );
         return;
     }
@@ -127,12 +245,21 @@ function renderRooms(blueprint) {
         );
 
         heading.appendChild(
-            createElement("span", "tag", room.exit ? "Exit" : "Room")
+            createElement(
+                "span",
+                "tag",
+                room.exit ? "Exit" : "Room"
+            )
         );
 
         card.appendChild(heading);
+
         card.appendChild(
-            createElement("p", "card-subtitle", `Room ID: ${id}`)
+            createElement(
+                "p",
+                "card-subtitle",
+                `Room ID: ${id}`
+            )
         );
 
         roomList.appendChild(card);
@@ -147,6 +274,7 @@ function updateSensor(reading) {
     }
 
     sensors.set(id, reading);
+
     lastUpdate.textContent = new Date().toLocaleTimeString();
 
     renderSensors();
@@ -154,7 +282,10 @@ function updateSensor(reading) {
 
 function connectWebSocket() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const websocket = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    const websocket = new WebSocket(
+        `${protocol}//${location.host}/ws`
+    );
 
     websocket.onopen = () => {
         setConnectionStatus("Connected");
@@ -173,11 +304,20 @@ function connectWebSocket() {
             sensors.clear();
 
             for (const reading of data.nodes || []) {
-                updateSensor(reading);
+                const id = reading.mac_address || reading.device;
+
+                if (id) {
+                    sensors.set(id, reading);
+                }
             }
 
             renderSensors();
             renderRooms(data.blueprint);
+
+            if (sensors.size > 0) {
+                lastUpdate.textContent =
+                    new Date().toLocaleTimeString();
+            }
         }
 
         if (data.type === "reading") {
@@ -187,6 +327,7 @@ function connectWebSocket() {
 
     websocket.onclose = () => {
         setConnectionStatus("Disconnected");
+
         setTimeout(connectWebSocket, 3000);
     };
 

@@ -233,3 +233,49 @@ footer {
         font-size: 24px;
     }
 }
+
+
+.sensor-card.status-safe {
+    border-left: 5px solid #16a34a;
+}
+
+.sensor-card.status-warning {
+    border-left: 5px solid #d97706;
+}
+
+.sensor-card.status-danger {
+    border-left: 5px solid #dc2626;
+}
+
+.sensor-card.status-unknown {
+    border-left: 5px solid #64748b;
+}
+
+.status-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.status-tag.status-safe {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-tag.status-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-tag.status-danger {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-tag.status-unknown {
+    background: #e2e8f0;
+    color: #334155;
+}
