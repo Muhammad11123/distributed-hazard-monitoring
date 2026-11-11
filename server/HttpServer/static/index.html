@@ -28,6 +28,21 @@
             dashboard for emergency evacuation decisions.
         </div>
 
+        <section
+            id="danger-banner"
+            class="danger-banner"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            hidden
+        >
+            <div class="danger-banner-icon" aria-hidden="true">!</div>
+            <div>
+                <h2 id="danger-banner-title">Hazard reported</h2>
+                <p id="danger-banner-message"></p>
+            </div>
+        </section>
+
         <section class="overview">
             <div class="stat">
                 <span class="stat-label">Sensors reporting</span>

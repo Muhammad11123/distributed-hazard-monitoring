@@ -84,6 +84,50 @@ h1 {
     margin-bottom: 24px;
 }
 
+.danger-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    background: #fef2f2;
+    border: 2px solid #dc2626;
+    border-radius: 12px;
+    color: #991b1b;
+}
+
+.danger-banner[hidden] {
+    display: none;
+}
+
+.danger-banner-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #dc2626;
+    color: white;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.danger-banner h2 {
+    margin: 0 0 6px;
+    color: #991b1b;
+    font-size: 20px;
+}
+
+.danger-banner p {
+    margin: 0;
+    color: #991b1b;
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
 .overview {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -285,31 +329,6 @@ footer {
     font-weight: 700;
 }
 
-.floor-room .floor-node {
-    fill: #dbeafe;
-    stroke: #2563eb;
-    stroke-width: 3;
-}
-
-.floor-exit .floor-node {
-    fill: #dcfce7;
-    stroke: #16a34a;
-    stroke-width: 3;
-}
-
-.floor-room .floor-node-id {
-    fill: #1d4ed8;
-}
-
-.floor-exit .floor-node-id {
-    fill: #166534;
-}
-
-.floor-node-id {
-    font-size: 13px;
-    font-weight: 700;
-}
-
 .floor-node-label {
     fill: #334155;
     font-size: 14px;
@@ -349,6 +368,15 @@ footer {
 
     .stat strong {
         font-size: 24px;
+    }
+
+    .danger-banner {
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .danger-banner h2 {
+        font-size: 17px;
     }
 
     .floor-plan {

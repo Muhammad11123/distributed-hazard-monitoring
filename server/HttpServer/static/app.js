@@ -1,6 +1,7 @@
 
 const sensors = new Map();
 const roomLevels = new Map();
+const hazardReasons = new Map();
 
 const sensorList = document.getElementById("sensor-list");
 const roomList = document.getElementById("room-list");
@@ -12,6 +13,10 @@ const lastUpdate = document.getElementById("last-update");
 
 const connectionStatus = document.getElementById("connection-status");
 const connectionDot = document.getElementById("connection-dot");
+
+const dangerBanner = document.getElementById("danger-banner");
+const dangerBannerTitle = document.getElementById("danger-banner-title");
+const dangerBannerMessage = document.getElementById("danger-banner-message");
 
 const svgNamespace = "http://www.w3.org/2000/svg";
 
@@ -50,6 +55,8 @@ function setConnectionStatus(status) {
     } else if (status === "Disconnected") {
         connectionDot.classList.add("disconnected");
     }
+
+    renderDangerBanner();
 }
 
 function formatValue(value, unit = "") {
@@ -162,15 +169,57 @@ function getSensorStatus(sensor) {
 }
 
 function getRoomLevel(roomId) {
-    const level = String(
-        roomLevels.get(roomId) ?? ""
-    ).toUpperCase();
+    const level = String(roomLevels.get(roomId) ?? "")
+        .trim()
+        .toUpperCase();
 
     if (["SAFE", "WARNING", "DANGER"].includes(level)) {
         return level;
     }
 
     return "UNKNOWN";
+}
+
+function renderDangerBanner() {
+    if (!dangerBanner) {
+        return;
+    }
+
+    const dangerRooms = [...roomLevels.keys()].filter(
+        roomId =>
+            getRoomLevel(roomId) === "DANGER" &&
+            currentBlueprint?.rooms?.[roomId]
+    );
+
+    if (dangerRooms.length === 0) {
+        dangerBanner.hidden = true;
+        return;
+    }
+
+    const names = dangerRooms.map(
+        roomId => currentBlueprint.rooms[roomId].name || roomId
+    );
+
+    dangerBannerTitle.textContent =
+        dangerRooms.length === 1
+            ? "DANGER reported in building"
+            : "DANGER reported in multiple rooms";
+
+    const details = dangerRooms.map(roomId => {
+        const name = currentBlueprint.rooms[roomId].name || roomId;
+        const reason = hazardReasons.get(roomId);
+
+        return reason ? `${name}: ${reason}` : name;
+    });
+
+    let message = details.join(" · ");
+
+    if (connectionStatus.textContent !== "Connected") {
+        message += " — Connection lost; hazard information may be outdated.";
+    }
+
+    dangerBannerMessage.textContent = message;
+    dangerBanner.hidden = false;
 }
 
 function selectRoom(roomId) {
@@ -214,11 +263,7 @@ function renderSensors() {
         const titleGroup = createElement("div");
 
         titleGroup.appendChild(
-            createElement(
-                "h3",
-                "",
-                sensor.device || "Unknown sensor"
-            )
+            createElement("h3", "", sensor.device || "Unknown sensor")
         );
 
         titleGroup.appendChild(
@@ -603,9 +648,10 @@ function renderFloorPlan(blueprint) {
 
     floorPlan.appendChild(svg);
 
-    const selectionMessage = selectedRoom && rooms[selectedRoom]
-        ? `Selected starting location: ${rooms[selectedRoom].name || selectedRoom} (${selectedRoom})`
-        : "Select a location on the diagram to set your starting room.";
+    const selectionMessage =
+        selectedRoom && rooms[selectedRoom]
+            ? `Selected starting location: ${rooms[selectedRoom].name || selectedRoom} (${selectedRoom})`
+            : "Select a location on the diagram to set your starting room.";
 
     const selectionLabel = createElement(
         "p",
@@ -634,6 +680,7 @@ function refreshBuilding() {
 
     renderRooms(currentBlueprint);
     renderFloorPlan(currentBlueprint);
+    renderDangerBanner();
 }
 
 function updateSensor(reading) {
@@ -672,6 +719,7 @@ function connectWebSocket() {
         if (data.type === "snapshot") {
             sensors.clear();
             roomLevels.clear();
+            hazardReasons.clear();
 
             currentBlueprint = data.blueprint || null;
 
@@ -683,7 +731,9 @@ function connectWebSocket() {
             }
 
             for (const [roomId, level] of Object.entries(data.levels || {})) {
-                roomLevels.set(roomId, level);
+                if (currentBlueprint?.rooms?.[roomId]) {
+                    roomLevels.set(roomId, level);
+                }
             }
 
             for (const reading of data.nodes || []) {
@@ -708,8 +758,15 @@ function connectWebSocket() {
         }
 
         if (data.type === "hazard") {
-            if (data.room && data.level) {
+            if (currentBlueprint?.rooms?.[data.room] && data.level) {
                 roomLevels.set(data.room, data.level);
+
+                if (getRoomLevel(data.room) === "DANGER" && data.reason) {
+                    hazardReasons.set(data.room, String(data.reason));
+                } else {
+                    hazardReasons.delete(data.room);
+                }
+
                 refreshBuilding();
             }
         }
@@ -727,4 +784,3 @@ function connectWebSocket() {
 
 renderSensors();
 connectWebSocket();
-
