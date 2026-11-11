@@ -104,6 +104,59 @@
                 </div>
             </div>
         </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <div>
+                    <h2>Sensor History</h2>
+                    <p>Historical environmental readings by room</p>
+                </div>
+            </div>
+
+            <div class="history-panel">
+                <div class="history-controls">
+                    <label for="history-room">Select room</label>
+                    <select id="history-room" disabled>
+                        <option value="">Waiting for building...</option>
+                    </select>
+                    <button id="refresh-history" type="button" disabled>
+                        Refresh history
+                    </button>
+                </div>
+
+                <p id="history-status" class="history-status" role="status">
+                    Waiting for building information...
+                </p>
+
+                <div class="history-grid">
+                    <article class="history-card">
+                        <h3>Temperature</h3>
+                        <p>Temperature readings (°C)</p>
+                        <div id="temperature-chart" class="chart-area">
+                            <div class="empty-state">
+                                No history loaded.
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="history-card">
+                        <h3>Humidity</h3>
+                        <p>Relative humidity readings (%)</p>
+                        <div id="humidity-chart" class="chart-area">
+                            <div class="empty-state">
+                                No history loaded.
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <p class="history-note">
+                    History is currently provided by the test API.
+                    Charts do not establish that readings were recorded
+                    by physical sensors.
+                </p>
+            </div>
+        </section>
     </main>
 
     <footer>

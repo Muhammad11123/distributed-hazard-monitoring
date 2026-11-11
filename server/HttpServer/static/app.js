@@ -18,10 +18,17 @@ const dangerBanner = document.getElementById("danger-banner");
 const dangerBannerTitle = document.getElementById("danger-banner-title");
 const dangerBannerMessage = document.getElementById("danger-banner-message");
 
+const historyRoom = document.getElementById("history-room");
+const historyStatus = document.getElementById("history-status");
+const refreshHistoryButton = document.getElementById("refresh-history");
+const temperatureChart = document.getElementById("temperature-chart");
+const humidityChart = document.getElementById("humidity-chart");
+
 const svgNamespace = "http://www.w3.org/2000/svg";
 
 let currentBlueprint = null;
 let selectedRoom = new URLSearchParams(window.location.search).get("room");
+let historyRequestId = 0;
 
 const roomColours = {
     SAFE: {
@@ -181,10 +188,6 @@ function getRoomLevel(roomId) {
 }
 
 function renderDangerBanner() {
-    if (!dangerBanner) {
-        return;
-    }
-
     const dangerRooms = [...roomLevels.keys()].filter(
         roomId =>
             getRoomLevel(roomId) === "DANGER" &&
@@ -195,10 +198,6 @@ function renderDangerBanner() {
         dangerBanner.hidden = true;
         return;
     }
-
-    const names = dangerRooms.map(
-        roomId => currentBlueprint.rooms[roomId].name || roomId
-    );
 
     dangerBannerTitle.textContent =
         dangerRooms.length === 1
@@ -412,10 +411,6 @@ function renderRooms(blueprint) {
 }
 
 function renderFloorPlan(blueprint) {
-    if (!floorPlan) {
-        return;
-    }
-
     floorPlan.replaceChildren();
 
     const rooms = blueprint?.rooms || {};
@@ -696,6 +691,295 @@ function updateSensor(reading) {
     renderSensors();
 }
 
+function showEmptyChart(container, message) {
+    container.replaceChildren(
+        createElement("div", "empty-state", message)
+    );
+}
+
+function renderHistoryChart(container, readings, field, label, unit, colour) {
+    container.replaceChildren();
+
+    const points = readings
+        .filter(item =>
+            item &&
+            item.ts !== null &&
+            item.ts !== undefined &&
+            item[field] !== null &&
+            item[field] !== undefined &&
+            item[field] !== ""
+        )
+        .map(item => ({
+            ts: Number(item.ts),
+            value: Number(item[field])
+        }))
+        .filter(item =>
+            Number.isFinite(item.ts) &&
+            Number.isFinite(item.value)
+        )
+        .sort((a, b) => a.ts - b.ts);
+
+    if (points.length === 0) {
+        showEmptyChart(container, `No ${label.toLowerCase()} history available.`);
+        return;
+    }
+
+    const width = 580;
+    const height = 270;
+    const left = 62;
+    const right = 20;
+    const top = 25;
+    const bottom = 55;
+
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+
+    const rawMinX = Math.min(...points.map(point => point.ts));
+    const rawMaxX = Math.max(...points.map(point => point.ts));
+    const rawMinY = Math.min(...points.map(point => point.value));
+    const rawMaxY = Math.max(...points.map(point => point.value));
+
+    const xMin = rawMinX;
+    const xMax = rawMaxX === rawMinX ? rawMinX + 1 : rawMaxX;
+
+    const marginY = Math.max((rawMaxY - rawMinY) * 0.15, 1);
+    const yMin = rawMinY - marginY;
+    const yMax = rawMaxY + marginY;
+
+    const xPosition = ts =>
+        left + ((ts - xMin) / (xMax - xMin)) * plotWidth;
+
+    const yPosition = value =>
+        top + (1 - (value - yMin) / (yMax - yMin)) * plotHeight;
+
+    const svg = svgElement("svg", {
+        viewBox: `0 0 ${width} ${height}`,
+        role: "img",
+        "aria-label": `${label} history chart with ${points.length} readings`
+    });
+
+    svg.classList.add("history-svg");
+
+    for (let index = 0; index <= 4; index++) {
+        const fraction = index / 4;
+        const y = top + fraction * plotHeight;
+        const value = yMax - fraction * (yMax - yMin);
+
+        svg.appendChild(
+            svgElement("line", {
+                x1: left,
+                y1: y,
+                x2: width - right,
+                y2: y,
+                stroke: "#e2e8f0",
+                "stroke-width": 1
+            })
+        );
+
+        svg.appendChild(
+            svgElement("text", {
+                x: left - 10,
+                y: y + 4,
+                "text-anchor": "end",
+                "font-size": 12,
+                fill: "#64748b"
+            }, value.toFixed(1))
+        );
+    }
+
+    const labels = [
+        { ts: rawMinX, x: left },
+        { ts: rawMaxX, x: width - right }
+    ];
+
+    if (rawMinX === rawMaxX) {
+        labels.pop();
+    }
+
+    for (const labelPoint of labels) {
+        svg.appendChild(
+            svgElement("text", {
+                x: labelPoint.x,
+                y: height - 30,
+                "text-anchor": labelPoint.x === left ? "start" : "end",
+                "font-size": 12,
+                fill: "#64748b"
+            }, labelPoint.ts)
+        );
+    }
+
+    svg.appendChild(
+        svgElement("text", {
+            x: width / 2,
+            y: height - 8,
+            "text-anchor": "middle",
+            "font-size": 12,
+            fill: "#64748b"
+        }, "Timestamp (raw API value)")
+    );
+
+    const pathData = points.map((point, index) => {
+        const x = xPosition(point.ts);
+        const y = yPosition(point.value);
+
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    }).join(" ");
+
+    svg.appendChild(
+        svgElement("path", {
+            d: pathData,
+            fill: "none",
+            stroke: colour,
+            "stroke-width": 3,
+            "stroke-linejoin": "round",
+            "stroke-linecap": "round"
+        })
+    );
+
+    for (const point of points) {
+        const circle = svgElement("circle", {
+            cx: xPosition(point.ts),
+            cy: yPosition(point.value),
+            r: 5,
+            fill: colour,
+            stroke: "white",
+            "stroke-width": 2
+        });
+
+        circle.appendChild(
+            svgElement(
+                "title",
+                {},
+                `${label}: ${point.value.toFixed(1)}${unit} at timestamp ${point.ts}`
+            )
+        );
+
+        svg.appendChild(circle);
+    }
+
+    container.appendChild(svg);
+
+    container.appendChild(
+        createElement(
+            "p",
+            "chart-summary",
+            `${points.length} reading(s) · Latest plotted value: ${points[points.length - 1].value.toFixed(1)}${unit}`
+        )
+    );
+}
+
+function populateHistoryRooms() {
+    const rooms = currentBlueprint?.rooms || {};
+    const previousSelection = historyRoom.value;
+
+    historyRoom.replaceChildren();
+
+    const entries = Object.entries(rooms).filter(
+        ([, room]) => room.exit !== true
+    );
+
+    if (entries.length === 0) {
+        historyRoom.appendChild(
+            new Option("No rooms available", "")
+        );
+        historyRoom.disabled = true;
+        refreshHistoryButton.disabled = true;
+        return;
+    }
+
+    for (const [id, room] of entries) {
+        historyRoom.appendChild(
+            new Option(room.name || id, id)
+        );
+    }
+
+    const preferredRoom = [
+        previousSelection,
+        selectedRoom,
+        entries[0][0]
+    ].find(id => entries.some(([roomId]) => roomId === id));
+
+    historyRoom.value = preferredRoom;
+    historyRoom.disabled = false;
+    refreshHistoryButton.disabled = false;
+
+    loadHistory();
+}
+
+async function loadHistory() {
+    const roomId = historyRoom.value;
+    const requestId = ++historyRequestId;
+
+    if (!roomId) {
+        return;
+    }
+
+    historyStatus.textContent = "Loading history...";
+    refreshHistoryButton.disabled = true;
+
+    try {
+        const response = await fetch(
+            `/api/history?${new URLSearchParams({ room: roomId })}`,
+            { cache: "no-store" }
+        );
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const readings = await response.json();
+
+        if (!Array.isArray(readings)) {
+            throw new Error("Unexpected history response format");
+        }
+
+        if (requestId !== historyRequestId) {
+            return;
+        }
+
+        const roomName =
+            currentBlueprint?.rooms?.[roomId]?.name || roomId;
+
+        historyStatus.textContent =
+            `${roomName}: ${readings.length} historical reading(s) returned.`;
+
+        renderHistoryChart(
+            temperatureChart,
+            readings,
+            "temperature",
+            "Temperature",
+            "°C",
+            "#2563eb"
+        );
+
+        renderHistoryChart(
+            humidityChart,
+            readings,
+            "humidity",
+            "Humidity",
+            "%",
+            "#0f766e"
+        );
+    } catch (error) {
+        if (requestId !== historyRequestId) {
+            return;
+        }
+
+        historyStatus.textContent =
+            `Unable to load history: ${error.message}`;
+
+        showEmptyChart(temperatureChart, "History unavailable.");
+        showEmptyChart(humidityChart, "History unavailable.");
+    } finally {
+        if (requestId === historyRequestId) {
+            refreshHistoryButton.disabled = false;
+        }
+    }
+}
+
+historyRoom.addEventListener("change", loadHistory);
+refreshHistoryButton.addEventListener("click", loadHistory);
+
 function connectWebSocket() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
 
@@ -746,6 +1030,7 @@ function connectWebSocket() {
 
             renderSensors();
             refreshBuilding();
+            populateHistoryRooms();
 
             if (sensors.size > 0) {
                 lastUpdate.textContent =
