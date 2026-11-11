@@ -16,6 +16,7 @@ const connectionDot = document.getElementById("connection-dot");
 const svgNamespace = "http://www.w3.org/2000/svg";
 
 let currentBlueprint = null;
+let selectedRoom = new URLSearchParams(window.location.search).get("room");
 
 const roomColours = {
     SAFE: {
@@ -161,13 +162,29 @@ function getSensorStatus(sensor) {
 }
 
 function getRoomLevel(roomId) {
-    const level = String(roomLevels.get(roomId) ?? "").toUpperCase();
+    const level = String(
+        roomLevels.get(roomId) ?? ""
+    ).toUpperCase();
 
     if (["SAFE", "WARNING", "DANGER"].includes(level)) {
         return level;
     }
 
     return "UNKNOWN";
+}
+
+function selectRoom(roomId) {
+    if (!currentBlueprint?.rooms?.[roomId]) {
+        return;
+    }
+
+    selectedRoom = roomId;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("room", roomId);
+    window.history.replaceState(null, "", url);
+
+    refreshBuilding();
 }
 
 function renderSensors() {
@@ -197,7 +214,11 @@ function renderSensors() {
         const titleGroup = createElement("div");
 
         titleGroup.appendChild(
-            createElement("h3", "", sensor.device || "Unknown sensor")
+            createElement(
+                "h3",
+                "",
+                sensor.device || "Unknown sensor"
+            )
         );
 
         titleGroup.appendChild(
@@ -327,6 +348,20 @@ function renderRooms(blueprint) {
         levelTag.style.marginTop = "12px";
 
         card.appendChild(levelTag);
+
+        if (selectedRoom === id) {
+            card.style.outline = "3px solid #2563eb";
+            card.style.outlineOffset = "2px";
+
+            card.appendChild(
+                createElement(
+                    "p",
+                    "card-subtitle",
+                    "Selected starting location"
+                )
+            );
+        }
+
         roomList.appendChild(card);
     }
 }
@@ -398,8 +433,8 @@ function renderFloorPlan(blueprint) {
 
     const svg = svgElement("svg", {
         viewBox: `${minX} ${minY} ${width} ${height}`,
-        role: "img",
-        "aria-label": "Building connectivity diagram showing reported room hazard levels",
+        role: "group",
+        "aria-label": "Building diagram. Select a room to set the starting location.",
         preserveAspectRatio: "xMidYMid meet"
     });
 
@@ -465,8 +500,30 @@ function renderFloorPlan(blueprint) {
     for (const [id, room] of roomPositions) {
         const level = getRoomLevel(id);
         const colours = roomColours[level];
+        const isSelected = selectedRoom === id;
 
-        const group = svgElement("g");
+        const group = svgElement("g", {
+            role: "button",
+            tabindex: "0",
+            "aria-label": `Select ${room.name} as starting location`,
+            "aria-pressed": isSelected ? "true" : "false"
+        });
+
+        group.style.cursor = "pointer";
+
+        if (isSelected) {
+            group.appendChild(
+                svgElement("circle", {
+                    cx: room.x,
+                    cy: room.y,
+                    r: 38,
+                    fill: "none",
+                    stroke: "#2563eb",
+                    "stroke-width": 4,
+                    "stroke-dasharray": "7 4"
+                })
+            );
+        }
 
         group.appendChild(
             svgElement("circle", {
@@ -530,10 +587,36 @@ function renderFloorPlan(blueprint) {
             )
         );
 
+        group.addEventListener("click", () => {
+            selectRoom(id);
+        });
+
+        group.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                selectRoom(id);
+            }
+        });
+
         svg.appendChild(group);
     }
 
     floorPlan.appendChild(svg);
+
+    const selectionMessage = selectedRoom && rooms[selectedRoom]
+        ? `Selected starting location: ${rooms[selectedRoom].name || selectedRoom} (${selectedRoom})`
+        : "Select a location on the diagram to set your starting room.";
+
+    const selectionLabel = createElement(
+        "p",
+        "floor-plan-note",
+        selectionMessage
+    );
+
+    selectionLabel.style.fontWeight = "700";
+    selectionLabel.style.color = "#1d4ed8";
+
+    floorPlan.appendChild(selectionLabel);
 
     floorPlan.appendChild(
         createElement(
@@ -577,7 +660,7 @@ function connectWebSocket() {
         setConnectionStatus("Connected");
     };
 
-    websocket.onmessage = (event) => {
+    websocket.onmessage = event => {
         let data;
 
         try {
@@ -591,6 +674,13 @@ function connectWebSocket() {
             roomLevels.clear();
 
             currentBlueprint = data.blueprint || null;
+
+            if (
+                selectedRoom &&
+                !currentBlueprint?.rooms?.[selectedRoom]
+            ) {
+                selectedRoom = null;
+            }
 
             for (const [roomId, level] of Object.entries(data.levels || {})) {
                 roomLevels.set(roomId, level);
@@ -637,3 +727,4 @@ function connectWebSocket() {
 
 renderSensors();
 connectWebSocket();
+
