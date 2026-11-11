@@ -119,12 +119,21 @@
                     <select id="history-room" disabled>
                         <option value="">Waiting for building...</option>
                     </select>
-                    <button id="refresh-history" type="button" disabled>
+
+                    <button
+                        id="refresh-history"
+                        type="button"
+                        disabled
+                    >
                         Refresh history
                     </button>
                 </div>
 
-                <p id="history-status" class="history-status" role="status">
+                <p
+                    id="history-status"
+                    class="history-status"
+                    role="status"
+                >
                     Waiting for building information...
                 </p>
 
@@ -132,7 +141,11 @@
                     <article class="history-card">
                         <h3>Temperature</h3>
                         <p>Temperature readings (°C)</p>
-                        <div id="temperature-chart" class="chart-area">
+
+                        <div
+                            id="temperature-chart"
+                            class="chart-area"
+                        >
                             <div class="empty-state">
                                 No history loaded.
                             </div>
@@ -142,7 +155,11 @@
                     <article class="history-card">
                         <h3>Humidity</h3>
                         <p>Relative humidity readings (%)</p>
-                        <div id="humidity-chart" class="chart-area">
+
+                        <div
+                            id="humidity-chart"
+                            class="chart-area"
+                        >
                             <div class="empty-state">
                                 No history loaded.
                             </div>
@@ -152,8 +169,125 @@
 
                 <p class="history-note">
                     History is currently provided by the test API.
-                    Charts do not establish that readings were recorded
-                    by physical sensors.
+                    Charts do not establish that readings were
+                    recorded by physical sensors.
+                </p>
+            </div>
+        </section>
+
+        <section class="section" aria-labelledby="replay-title">
+            <div class="section-heading">
+                <div>
+                    <h2 id="replay-title">Replay Preview</h2>
+                    <p>
+                        Inspect recorded or simulated readings
+                        without changing live monitoring
+                    </p>
+                </div>
+            </div>
+
+            <div class="replay-panel">
+                <div class="replay-heading">
+                    <strong>Historical Data Preview</strong>
+                    <span class="replay-badge">REPLAY</span>
+                </div>
+
+                <p class="replay-description">
+                    The current API returns historical readings
+                    immediately. Timed incident playback will be
+                    connected when the backend replay service
+                    is available.
+                </p>
+
+                <div class="replay-controls">
+                    <div class="replay-field">
+                        <label for="replay-room">Room</label>
+                        <select id="replay-room" disabled>
+                            <option value="">
+                                Waiting for building...
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="replay-field">
+                        <label for="replay-from">From timestamp</label>
+                        <input
+                            id="replay-from"
+                            type="number"
+                            step="any"
+                            value="1000"
+                        >
+                    </div>
+
+                    <div class="replay-field">
+                        <label for="replay-to">To timestamp</label>
+                        <input
+                            id="replay-to"
+                            type="number"
+                            step="any"
+                            value="2000"
+                        >
+                    </div>
+
+                    <button
+                        id="load-replay"
+                        type="button"
+                        disabled
+                    >
+                        Load preview
+                    </button>
+                </div>
+
+                <p
+                    id="replay-status"
+                    class="replay-status"
+                    role="status"
+                >
+                    Select a room and load a replay preview.
+                </p>
+
+                <div
+                    id="replay-display"
+                    class="replay-display"
+                    hidden
+                >
+                    <div class="replay-reading-heading">
+                        <strong id="replay-position">
+                            Reading 0 of 0
+                        </strong>
+
+                        <span id="replay-timestamp">
+                            Timestamp: --
+                        </span>
+                    </div>
+
+                    <div id="replay-values" class="replay-values">
+                    </div>
+
+                    <div class="replay-navigation">
+                        <button
+                            id="replay-previous"
+                            type="button"
+                            disabled
+                        >
+                            Previous
+                        </button>
+
+                        <button
+                            id="replay-next"
+                            type="button"
+                            disabled
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+
+                <p class="history-note">
+                    REPLAY PREVIEW — Historical test data.
+                    This is separate from the live sensor
+                    display and does not represent an active
+                    emergency or verified evacuation event.
                 </p>
             </div>
         </section>

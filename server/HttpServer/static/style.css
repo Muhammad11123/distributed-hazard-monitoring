@@ -342,7 +342,8 @@ footer {
     color: #64748b;
 }
 
-.history-panel {
+.history-panel,
+.replay-panel {
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -356,12 +357,15 @@ footer {
     gap: 12px;
 }
 
-.history-controls label {
+.history-controls label,
+.replay-field label {
     font-size: 13px;
     font-weight: 700;
 }
 
-.history-controls select {
+.history-controls select,
+.replay-field select,
+.replay-field input {
     min-width: 160px;
     padding: 10px 12px;
     border: 1px solid #cbd5e1;
@@ -371,7 +375,9 @@ footer {
     font-size: 14px;
 }
 
-.history-controls button {
+.history-controls button,
+.replay-controls button,
+.replay-navigation button {
     background: #1d4ed8;
     border: 0;
     border-radius: 8px;
@@ -382,11 +388,15 @@ footer {
     cursor: pointer;
 }
 
-.history-controls button:hover:not(:disabled) {
+.history-controls button:hover:not(:disabled),
+.replay-controls button:hover:not(:disabled),
+.replay-navigation button:hover:not(:disabled) {
     background: #1e40af;
 }
 
-.history-controls button:disabled {
+.history-controls button:disabled,
+.replay-controls button:disabled,
+.replay-navigation button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -446,6 +456,154 @@ footer {
     line-height: 1.6;
 }
 
+.replay-panel {
+    border-top: 4px solid #7c3aed;
+}
+
+.replay-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.replay-heading strong {
+    font-size: 16px;
+}
+
+.replay-badge {
+    display: inline-block;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: #ede9fe;
+    color: #5b21b6;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.replay-description {
+    margin: 0 0 22px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.replay-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    align-items: end;
+    gap: 14px;
+}
+
+.replay-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.replay-field select,
+.replay-field input {
+    width: 100%;
+    min-width: 0;
+}
+
+.replay-controls button {
+    min-height: 42px;
+    white-space: nowrap;
+}
+
+.replay-status {
+    margin: 18px 0;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.replay-display {
+    background: #f8fafc;
+    border: 1px solid #ddd6fe;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 18px;
+}
+
+.replay-display[hidden] {
+    display: none;
+}
+
+.replay-reading-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 18px;
+}
+
+.replay-reading-heading strong {
+    color: #5b21b6;
+    font-size: 15px;
+}
+
+.replay-reading-heading span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.replay-values {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.replay-value {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    padding: 16px;
+    min-width: 0;
+}
+
+.replay-value span {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.replay-value strong {
+    display: block;
+    font-size: 22px;
+    color: #1e293b;
+    overflow-wrap: anywhere;
+}
+
+.replay-navigation {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.replay-navigation button {
+    min-width: 110px;
+}
+
+@media (max-width: 900px) {
+    .replay-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .replay-values {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 700px) {
     .header {
         flex-direction: column;
@@ -491,11 +649,30 @@ footer {
         min-width: 320px;
     }
 
-    .history-panel {
+    .history-panel,
+    .replay-panel {
         padding: 14px;
     }
 
-    .history-grid {
+    .history-grid,
+    .replay-controls {
         grid-template-columns: 1fr;
+    }
+
+    .replay-values {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .replay-value {
+        padding: 12px;
+    }
+
+    .replay-value strong {
+        font-size: 18px;
+    }
+
+    .replay-navigation button {
+        flex: 1;
     }
 }

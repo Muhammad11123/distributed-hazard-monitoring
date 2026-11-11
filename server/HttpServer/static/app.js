@@ -24,11 +24,27 @@ const refreshHistoryButton = document.getElementById("refresh-history");
 const temperatureChart = document.getElementById("temperature-chart");
 const humidityChart = document.getElementById("humidity-chart");
 
+const replayRoom = document.getElementById("replay-room");
+const replayFrom = document.getElementById("replay-from");
+const replayTo = document.getElementById("replay-to");
+const loadReplayButton = document.getElementById("load-replay");
+const replayStatus = document.getElementById("replay-status");
+const replayDisplay = document.getElementById("replay-display");
+const replayPosition = document.getElementById("replay-position");
+const replayTimestamp = document.getElementById("replay-timestamp");
+const replayValues = document.getElementById("replay-values");
+const replayPrevious = document.getElementById("replay-previous");
+const replayNext = document.getElementById("replay-next");
+
 const svgNamespace = "http://www.w3.org/2000/svg";
 
 let currentBlueprint = null;
 let selectedRoom = new URLSearchParams(window.location.search).get("room");
 let historyRequestId = 0;
+
+let replayReadings = [];
+let replayIndex = 0;
+let replayRequestId = 0;
 
 const roomColours = {
     SAFE: {
@@ -262,7 +278,11 @@ function renderSensors() {
         const titleGroup = createElement("div");
 
         titleGroup.appendChild(
-            createElement("h3", "", sensor.device || "Unknown sensor")
+            createElement(
+                "h3",
+                "",
+                sensor.device || "Unknown sensor"
+            )
         );
 
         titleGroup.appendChild(
@@ -720,7 +740,10 @@ function renderHistoryChart(container, readings, field, label, unit, colour) {
         .sort((a, b) => a.ts - b.ts);
 
     if (points.length === 0) {
-        showEmptyChart(container, `No ${label.toLowerCase()} history available.`);
+        showEmptyChart(
+            container,
+            `No ${label.toLowerCase()} history available.`
+        );
         return;
     }
 
@@ -977,8 +1000,262 @@ async function loadHistory() {
     }
 }
 
+function resetReplay(message) {
+    replayRequestId += 1;
+    replayReadings = [];
+    replayIndex = 0;
+
+    replayDisplay.hidden = true;
+    replayValues.replaceChildren();
+    replayPosition.textContent = "Reading 0 of 0";
+    replayTimestamp.textContent = "Timestamp: --";
+    replayPrevious.disabled = true;
+    replayNext.disabled = true;
+    replayStatus.textContent = message;
+}
+
+function populateReplayRooms() {
+    const rooms = currentBlueprint?.rooms || {};
+    const previousSelection = replayRoom.value;
+
+    replayRoom.replaceChildren();
+
+    const entries = Object.entries(rooms).filter(
+        ([, room]) => room.exit !== true
+    );
+
+    if (entries.length === 0) {
+        replayRoom.appendChild(
+            new Option("No rooms available", "")
+        );
+        replayRoom.disabled = true;
+        loadReplayButton.disabled = true;
+        resetReplay("No rooms are available for replay.");
+        return;
+    }
+
+    for (const [id, room] of entries) {
+        replayRoom.appendChild(
+            new Option(room.name || id, id)
+        );
+    }
+
+    const preferredRoom = [
+        previousSelection,
+        selectedRoom,
+        entries[0][0]
+    ].find(id => entries.some(([roomId]) => roomId === id));
+
+    replayRoom.value = preferredRoom;
+    replayRoom.disabled = false;
+    loadReplayButton.disabled = false;
+
+    resetReplay("Select a room and load a replay preview.");
+}
+
+function renderReplayReading() {
+    if (replayReadings.length === 0) {
+        replayDisplay.hidden = true;
+        return;
+    }
+
+    const reading = replayReadings[replayIndex];
+
+    replayDisplay.hidden = false;
+
+    replayPosition.textContent =
+        `Reading ${replayIndex + 1} of ${replayReadings.length}`;
+
+    replayTimestamp.textContent =
+        `Timestamp: ${reading.ts ?? "N/A"}`;
+
+    replayValues.replaceChildren();
+
+    const fields = [
+        ["Temperature", "temperature", "°C"],
+        ["Humidity", "humidity", "%"],
+        ["CO₂", "carbon_dioxide", ""],
+        ["Natural gas", "natural_gas", ""],
+        ["Carbon monoxide", "carbon_monoxide", ""],
+        ["Smoke", "smoke", ""]
+    ];
+
+    for (const [label, key, unit] of fields) {
+        if (!Object.prototype.hasOwnProperty.call(reading, key)) {
+            continue;
+        }
+
+        const item = createElement("div", "replay-value");
+
+        item.appendChild(
+            createElement("span", "", label)
+        );
+
+        item.appendChild(
+            createElement(
+                "strong",
+                "",
+                formatValue(reading[key], unit)
+            )
+        );
+
+        replayValues.appendChild(item);
+    }
+
+    if (replayValues.children.length === 0) {
+        replayValues.appendChild(
+            createElement(
+                "p",
+                "empty-state",
+                "No environmental measurements in this reading."
+            )
+        );
+    }
+
+    replayPrevious.disabled = replayIndex === 0;
+    replayNext.disabled =
+        replayIndex >= replayReadings.length - 1;
+}
+
+async function loadReplayPreview() {
+    const room = replayRoom.value;
+    const fromValue = replayFrom.value.trim();
+    const toValue = replayTo.value.trim();
+
+    if (!room || !currentBlueprint?.rooms?.[room]) {
+        resetReplay("Select a valid room.");
+        return;
+    }
+
+    if (fromValue === "" || toValue === "") {
+        resetReplay("Enter both timestamps.");
+        return;
+    }
+
+    const fromTime = Number(fromValue);
+    const toTime = Number(toValue);
+
+    if (
+        !Number.isFinite(fromTime) ||
+        !Number.isFinite(toTime)
+    ) {
+        resetReplay("Both timestamps must be valid numbers.");
+        return;
+    }
+
+    if (fromTime > toTime) {
+        resetReplay("The start timestamp must not exceed the end timestamp.");
+        return;
+    }
+
+    resetReplay("Loading replay preview...");
+
+    const requestId = replayRequestId;
+    loadReplayButton.disabled = true;
+
+    try {
+        const response = await fetch("/api/replay", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                room: room,
+                from_time: fromTime,
+                to_time: toTime
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (
+            data.type !== "replay" ||
+            !Array.isArray(data.readings)
+        ) {
+            throw new Error("Unexpected replay response format");
+        }
+
+        if (requestId !== replayRequestId) {
+            return;
+        }
+
+        replayReadings = data.readings
+            .filter(item =>
+                item &&
+                item.ts !== null &&
+                item.ts !== undefined &&
+                Number.isFinite(Number(item.ts))
+            )
+            .sort((a, b) => Number(a.ts) - Number(b.ts));
+
+        replayIndex = 0;
+
+        const roomName =
+            currentBlueprint.rooms[room]?.name || room;
+
+        if (replayReadings.length === 0) {
+            replayStatus.textContent =
+                `No replay readings found for ${roomName} in this range.`;
+            replayDisplay.hidden = true;
+            return;
+        }
+
+        replayStatus.textContent =
+            `${replayReadings.length} reading(s) loaded for ${roomName}. ` +
+            "Use Previous and Next to inspect them.";
+
+        renderReplayReading();
+    } catch (error) {
+        if (requestId !== replayRequestId) {
+            return;
+        }
+
+        resetReplay(
+            `Unable to load replay preview: ${error.message}`
+        );
+    } finally {
+        if (requestId === replayRequestId) {
+            loadReplayButton.disabled = false;
+        }
+    }
+}
+
+function showPreviousReplayReading() {
+    if (replayIndex > 0) {
+        replayIndex -= 1;
+        renderReplayReading();
+    }
+}
+
+function showNextReplayReading() {
+    if (replayIndex < replayReadings.length - 1) {
+        replayIndex += 1;
+        renderReplayReading();
+    }
+}
+
 historyRoom.addEventListener("change", loadHistory);
 refreshHistoryButton.addEventListener("click", loadHistory);
+
+replayRoom.addEventListener("change", () => {
+    resetReplay("Room changed. Load a new replay preview.");
+});
+
+replayFrom.addEventListener("input", () => {
+    resetReplay("Time range changed. Load a new replay preview.");
+});
+
+replayTo.addEventListener("input", () => {
+    resetReplay("Time range changed. Load a new replay preview.");
+});
+
+loadReplayButton.addEventListener("click", loadReplayPreview);
+replayPrevious.addEventListener("click", showPreviousReplayReading);
+replayNext.addEventListener("click", showNextReplayReading);
 
 function connectWebSocket() {
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -1031,6 +1308,7 @@ function connectWebSocket() {
             renderSensors();
             refreshBuilding();
             populateHistoryRooms();
+            populateReplayRooms();
 
             if (sensors.size > 0) {
                 lastUpdate.textContent =
