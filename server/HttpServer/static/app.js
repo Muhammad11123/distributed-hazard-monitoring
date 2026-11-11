@@ -1,5 +1,6 @@
 
 const sensors = new Map();
+const roomLevels = new Map();
 
 const sensorList = document.getElementById("sensor-list");
 const roomList = document.getElementById("room-list");
@@ -13,6 +14,31 @@ const connectionStatus = document.getElementById("connection-status");
 const connectionDot = document.getElementById("connection-dot");
 
 const svgNamespace = "http://www.w3.org/2000/svg";
+
+let currentBlueprint = null;
+
+const roomColours = {
+    SAFE: {
+        fill: "#dcfce7",
+        stroke: "#16a34a",
+        text: "#166534"
+    },
+    WARNING: {
+        fill: "#fef3c7",
+        stroke: "#d97706",
+        text: "#92400e"
+    },
+    DANGER: {
+        fill: "#fee2e2",
+        stroke: "#dc2626",
+        text: "#991b1b"
+    },
+    UNKNOWN: {
+        fill: "#e2e8f0",
+        stroke: "#64748b",
+        text: "#334155"
+    }
+};
 
 function setConnectionStatus(status) {
     connectionStatus.textContent = status;
@@ -134,6 +160,16 @@ function getSensorStatus(sensor) {
     };
 }
 
+function getRoomLevel(roomId) {
+    const level = String(roomLevels.get(roomId) ?? "").toUpperCase();
+
+    if (["SAFE", "WARNING", "DANGER"].includes(level)) {
+        return level;
+    }
+
+    return "UNKNOWN";
+}
+
 function renderSensors() {
     sensorList.replaceChildren();
     sensorCount.textContent = sensors.size;
@@ -161,11 +197,7 @@ function renderSensors() {
         const titleGroup = createElement("div");
 
         titleGroup.appendChild(
-            createElement(
-                "h3",
-                "",
-                sensor.device || "Unknown sensor"
-            )
+            createElement("h3", "", sensor.device || "Unknown sensor")
         );
 
         titleGroup.appendChild(
@@ -279,6 +311,22 @@ function renderRooms(blueprint) {
             )
         );
 
+        const level = getRoomLevel(id);
+        const colours = roomColours[level];
+
+        const levelTag = createElement(
+            "span",
+            "tag",
+            `Level: ${level}`
+        );
+
+        levelTag.style.backgroundColor = colours.fill;
+        levelTag.style.color = colours.text;
+        levelTag.style.fontWeight = "700";
+        levelTag.style.display = "inline-block";
+        levelTag.style.marginTop = "12px";
+
+        card.appendChild(levelTag);
         roomList.appendChild(card);
     }
 }
@@ -333,7 +381,7 @@ function renderFloorPlan(blueprint) {
     const ys = [...roomPositions.values()].map(room => room.y);
 
     const paddingX = 100;
-    const paddingY = 95;
+    const paddingY = 110;
 
     const minX = Math.min(...xs) - paddingX;
     const minY = Math.min(...ys) - paddingY;
@@ -344,14 +392,14 @@ function renderFloorPlan(blueprint) {
     );
 
     const height = Math.max(
-        200,
+        220,
         Math.max(...ys) - Math.min(...ys) + paddingY * 2
     );
 
     const svg = svgElement("svg", {
         viewBox: `${minX} ${minY} ${width} ${height}`,
         role: "img",
-        "aria-label": "Building connectivity diagram showing rooms and exits",
+        "aria-label": "Building connectivity diagram showing reported room hazard levels",
         preserveAspectRatio: "xMidYMid meet"
     });
 
@@ -363,7 +411,6 @@ function renderFloorPlan(blueprint) {
         }
 
         const [startId, endId, weight] = connection;
-
         const start = roomPositions.get(startId);
         const end = roomPositions.get(endId);
 
@@ -371,15 +418,15 @@ function renderFloorPlan(blueprint) {
             continue;
         }
 
-        const line = svgElement("line", {
-            x1: start.x,
-            y1: start.y,
-            x2: end.x,
-            y2: end.y,
-            class: "floor-connection"
-        });
-
-        svg.appendChild(line);
+        svg.appendChild(
+            svgElement("line", {
+                x1: start.x,
+                y1: start.y,
+                x2: end.x,
+                y2: end.y,
+                class: "floor-connection"
+            })
+        );
 
         if (
             weight !== undefined &&
@@ -389,9 +436,7 @@ function renderFloorPlan(blueprint) {
             const middleX = (start.x + end.x) / 2;
             const middleY = (start.y + end.y) / 2 - 16;
 
-            const weightGroup = svgElement("g");
-
-            weightGroup.appendChild(
+            svg.appendChild(
                 svgElement("rect", {
                     x: middleX - 16,
                     y: middleY - 14,
@@ -402,7 +447,7 @@ function renderFloorPlan(blueprint) {
                 })
             );
 
-            weightGroup.appendChild(
+            svg.appendChild(
                 svgElement(
                     "text",
                     {
@@ -414,22 +459,23 @@ function renderFloorPlan(blueprint) {
                     weight
                 )
             );
-
-            svg.appendChild(weightGroup);
         }
     }
 
     for (const [id, room] of roomPositions) {
-        const group = svgElement("g", {
-            class: room.exit ? "floor-exit" : "floor-room"
-        });
+        const level = getRoomLevel(id);
+        const colours = roomColours[level];
+
+        const group = svgElement("g");
 
         group.appendChild(
             svgElement("circle", {
                 cx: room.x,
                 cy: room.y,
                 r: 30,
-                class: "floor-node"
+                fill: colours.fill,
+                stroke: colours.stroke,
+                "stroke-width": 3
             })
         );
 
@@ -440,7 +486,9 @@ function renderFloorPlan(blueprint) {
                     x: room.x,
                     y: room.y + 5,
                     "text-anchor": "middle",
-                    class: "floor-node-id"
+                    "font-size": 13,
+                    "font-weight": 700,
+                    fill: colours.text
                 },
                 room.exit ? "EXIT" : id
             )
@@ -461,9 +509,24 @@ function renderFloorPlan(blueprint) {
 
         group.appendChild(
             svgElement(
+                "text",
+                {
+                    x: room.x,
+                    y: room.y + 71,
+                    "text-anchor": "middle",
+                    "font-size": 12,
+                    "font-weight": 700,
+                    fill: colours.text
+                },
+                level
+            )
+        );
+
+        group.appendChild(
+            svgElement(
                 "title",
                 {},
-                `${room.name} (${id})${room.exit ? " — Exit" : ""}`
+                `${room.name} (${id}) — ${level}`
             )
         );
 
@@ -476,9 +539,18 @@ function renderFloorPlan(blueprint) {
         createElement(
             "p",
             "floor-plan-note",
-            "Connectivity diagram only. Connection weights are not verified distances. Not to scale."
+            "Colours show reported room levels. Connection weights are not verified distances. Not to scale."
         )
     );
+}
+
+function refreshBuilding() {
+    if (!currentBlueprint) {
+        return;
+    }
+
+    renderRooms(currentBlueprint);
+    renderFloorPlan(currentBlueprint);
 }
 
 function updateSensor(reading) {
@@ -489,7 +561,6 @@ function updateSensor(reading) {
     }
 
     sensors.set(id, reading);
-
     lastUpdate.textContent = new Date().toLocaleTimeString();
 
     renderSensors();
@@ -517,6 +588,13 @@ function connectWebSocket() {
 
         if (data.type === "snapshot") {
             sensors.clear();
+            roomLevels.clear();
+
+            currentBlueprint = data.blueprint || null;
+
+            for (const [roomId, level] of Object.entries(data.levels || {})) {
+                roomLevels.set(roomId, level);
+            }
 
             for (const reading of data.nodes || []) {
                 const id = reading.mac_address || reading.device;
@@ -527,8 +605,7 @@ function connectWebSocket() {
             }
 
             renderSensors();
-            renderRooms(data.blueprint);
-            renderFloorPlan(data.blueprint);
+            refreshBuilding();
 
             if (sensors.size > 0) {
                 lastUpdate.textContent =
@@ -538,6 +615,13 @@ function connectWebSocket() {
 
         if (data.type === "reading") {
             updateSensor(data);
+        }
+
+        if (data.type === "hazard") {
+            if (data.room && data.level) {
+                roomLevels.set(data.room, data.level);
+                refreshBuilding();
+            }
         }
     };
 
