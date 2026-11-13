@@ -281,7 +281,7 @@ function renderSensors() {
             createElement(
                 "h3",
                 "",
-                sensor.device || "Unknown sensor"
+                sensor.device_name || "Unknown sensor"
             )
         );
 
@@ -289,7 +289,7 @@ function renderSensors() {
             createElement(
                 "p",
                 "card-subtitle",
-                sensor.mac_address || ""
+                sensor.mac || ""
             )
         );
 
@@ -699,7 +699,7 @@ function refreshBuilding() {
 }
 
 function updateSensor(reading) {
-    const id = reading.mac_address || reading.device;
+    const id = reading.mac || reading.device_name;
 
     if (!id) {
         return;
@@ -1298,7 +1298,7 @@ function connectWebSocket() {
             }
 
             for (const reading of data.nodes || []) {
-                const id = reading.mac_address || reading.device;
+                const id = reading.mac || reading.device_name;
 
                 if (id) {
                     sensors.set(id, reading);

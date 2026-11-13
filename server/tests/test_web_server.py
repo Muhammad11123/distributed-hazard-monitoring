@@ -11,9 +11,9 @@ client = TestClient(app)
 
 def test_get_nodes(monkeypatch):
     sample_readings = {
-        "AABBCCDDEE01": {
-            "device": "NODE-1",
-            "mac_address": "AABBCCDDEE01",
+        "AA:BB:CC:DD:EE:01": {
+            "device_name": "NODE-1",
+            "mac": "AA:BB:CC:DD:EE:01",
             "temperature": 25.5,
             "humidity": 60.0
         }
@@ -27,7 +27,8 @@ def test_get_nodes(monkeypatch):
     data = response.json()
     assert isinstance(data, list)
     assert len(data) == 1
-    assert data[0]["device"] == "NODE-1"
+    assert data[0]["device_name"] == "NODE-1"
+    assert data[0]["mac"] == "AA:BB:CC:DD:EE:01"
     assert data[0]["temperature"] == 25.5
     assert data[0]["humidity"] == 60.0
 
@@ -132,13 +133,13 @@ def test_udp_to_websocket_integration(monkeypatch):
                 )
             )
 
-            # Send through UDP to check the full integration
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
                 sender.sendto(message.to_bytes(), ("127.0.0.1", udp_port))
 
             update = websocket.receive_json()
             assert update["type"] == "reading"
-            assert update["device"] == "INTEGRATION-TEST"
+            assert update["device_name"] == "INTEGRATION-TEST"
+            assert update["mac"] == "AA:BB:CC:DD:EE:03"
             assert update["temperature"] == 31.5
             assert update["humidity"] == 58.0
 
@@ -147,8 +148,8 @@ def test_udp_to_websocket_integration(monkeypatch):
 
             nodes = response.json()
             assert len(nodes) == 1
-            assert nodes[0]["device"] == "INTEGRATION-TEST"
-            assert nodes[0]["mac_address"] == "AABBCCDDEE03"
+            assert nodes[0]["device_name"] == "INTEGRATION-TEST"
+            assert nodes[0]["mac"] == "AA:BB:CC:DD:EE:03"
             assert nodes[0]["temperature"] == 31.5
             assert nodes[0]["humidity"] == 58.0
 
